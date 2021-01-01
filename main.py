@@ -41,8 +41,8 @@ class Cloner:
 	def __resolveUrlPath(self, urlparsed):
 		path = urlparsed.path if urlparsed.path else ''
 		params = ';' + urlparsed.params if urlparsed.params else ''
-		query = ';' + urlparsed.query if urlparsed.query else ''
-		fragment = ';' + urlparsed.fragment if urlparsed.fragment else ''
+		query = '?' + urlparsed.query if urlparsed.query else ''
+		fragment = '#' + urlparsed.fragment if urlparsed.fragment else ''
 
 		return os.path.abspath(f"{path}{params}{query}{fragment}")
 
@@ -105,5 +105,6 @@ class Cloner:
 					Cloner(url, completed=self.__completed)
 
 if __name__ == "__main__":
-	url = "https://demo.adminkit.io/"
+	# url = "https://demo.adminkit.io/"
+	url = "https://siplah.tubankab.go.id/"
 	cloner = Cloner(url)
