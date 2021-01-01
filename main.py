@@ -105,6 +105,5 @@ class Cloner:
 					Cloner(url, completed=self.__completed)
 
 if __name__ == "__main__":
-	# url = "https://demo.adminkit.io/"
-	url = "https://siplah.tubankab.go.id/"
+	url = "https://demo.adminkit.io/"
 	cloner = Cloner(url)
