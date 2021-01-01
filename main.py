@@ -1,5 +1,4 @@
-import os, requests,datetime
-from os.path import basename, dirname
+import os, requests, re
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 
@@ -7,7 +6,7 @@ from urllib.parse import urlparse, urljoin
 class Cloner:
 	def __init__(self, url, project_dir = None, completed = []) -> None:
 		super().__init__()
-		print(f"Waktu dimulai : {datetime.datetime.now()}")
+		print(url, "DOWNLOADING...")
 		self.request = requests.Session()
 		self.url = url
 		self.urlparsed = urlparse(url)
@@ -63,6 +62,36 @@ class Cloner:
 
 				el.attrs[mode] = link
 
+	def __resolveCssUrl(self, pathfile):
+		with open(pathfile, 'rb') as file:
+			content = file.read().decode('utf-8')
+			links = re.findall(r'url\((.*?)\)', content)
+			for link in links:
+				link = link.strip('\'').strip('"')
+
+				linkParsed = urlparse(link)
+				link = urljoin(self.__resolveBaseurl(), link)
+				link = urljoin(link, linkParsed.path)
+				linkParsed = urlparse(link)
+				
+				if linkParsed.netloc == self.urlparsed.netloc and link not in self.__completed:
+	
+					path = os.path.join(self.project_dir, linkParsed.path.lstrip('/'))
+					dirname = os.path.dirname(path)
+					basename = os.path.basename(path)
+
+					if basename:
+						os.makedirs(dirname, exist_ok=True)
+
+						print(link,"DOWNLOADING...")
+
+						resp = self.request.get(link)
+						with open(path, 'wb') as file:
+							file.write(resp.content if resp.status_code == 200 else str.encode(''))
+							self.__completed.append(link)
+							print(link,"DONE...")
+
+
 	def downloadAsset(self, elements, attribute):
 		for el in self.bs4.find_all(elements):
 			link = el.get(attribute)
@@ -74,21 +103,30 @@ class Cloner:
 				if basename:
 					os.makedirs(dirname, exist_ok=True)
 
+					print(link,"DOWNLOADING...")
 					resp = self.request.get(link)
 					with open(path, 'wb') as file:
 						file.write(resp.content if resp.status_code == 200 else str.encode(''))
 						self.__completed.append(link)
+						print(link,"DONE...")
+
+					if basename.endswith('.css'):
+						self.__resolveCssUrl(path)
 
 	def downloadPage(self):
-		path = os.path.join(self.project_dir, self.urlparsed.path.lstrip('/') if self.urlparsed.path.lstrip('/') else 'index.html')
-		self.__resolveLink(['a', 'area', 'base', 'link'],'href')
-		self.__resolveLink(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'],'src')
-		
-		with open(path, 'w') as file:
-			file.write(self.bs4.prettify())
+		if self.url not in self.__completed:
+			path = os.path.join(self.project_dir, self.urlparsed.path.lstrip('/') if self.urlparsed.path.lstrip('/') else 'index.html')
 
-		self.__resolveLink(['a', 'area', 'base', 'link'],'href', self.__resolveBaseurl())
-		self.__resolveLink(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'],'src', self.__resolveBaseurl())
+			self.__resolveLink(['a', 'area', 'base', 'link'],'href')
+			self.__resolveLink(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'],'src')
+			
+			with open(path, 'w') as file:
+				file.write(self.bs4.prettify())
+				self.__completed.append(self.url)
+				print(self.url, "DONE...")
+
+			self.__resolveLink(['a', 'area', 'base', 'link'],'href', self.__resolveBaseurl())
+			self.__resolveLink(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'],'src', self.__resolveBaseurl())
 
 	def startQueue(self):
 		self.downloadAsset(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'], 'src')
@@ -100,9 +138,7 @@ class Cloner:
 			if url and url != '#' and url not in self.__completed:
 				urlparsed = urlparse(url)
 				if urlparsed.netloc == self.urlparsed.netloc:
-					print(url)
-					self.__completed.append(url)
-					Cloner(url, completed=self.__completed)
+					Cloner(url, project_dir=self.project_dir, completed=self.__completed)
 
 if __name__ == "__main__":
 	url = "https://demo.adminkit.io/"
