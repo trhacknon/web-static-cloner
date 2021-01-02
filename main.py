@@ -12,16 +12,14 @@ class Cloner:
 		self.project_dir = os.path.abspath(os.path.realpath(project_dir if project_dir else self.urlparsed.netloc))
 		
 		resp = self.request.get(url)
+		self.pages = []
+		self.__completed = completed
 		if resp.status_code == 200:
 			self.bs4 = BeautifulSoup(resp.text, 'lxml')
 
-			# self.__resolveLink(['a', 'area', 'base', 'link'],'href', self.__resolveBaseurl())
-			# self.__resolveLink(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'],'src', self.__resolveBaseurl())
-
-			self.pages = []
-			self.__completed = completed
 			self.startQueue()
 		else:
+			self.__completed.append(url)
 			print(f"{url} 404 Not Found.")
 
 	def __resolveBaseurl(self):
@@ -142,6 +140,6 @@ class Cloner:
 						Cloner(url, project_dir=self.project_dir, completed=self.__completed)
 
 if __name__ == "__main__":
-	# url = "https://demo.adminkit.io"
-	url = "https://demos.creative-tim.com/argon-dashboard-pro/pages/dashboards/dashboard.html"
+	url = "https://demo.adminkit.io"
+	# url = "https://demos.creative-tim.com/argon-dashboard-pro/pages/dashboards/dashboard.html"
 	cloner = Cloner(url)
