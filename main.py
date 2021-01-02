@@ -16,7 +16,9 @@ class Cloner:
 		self.__completed = completed
 		if resp.status_code == 200:
 			self.bs4 = BeautifulSoup(resp.text, 'lxml')
-
+			self.__resolveBaseurl()
+			self.__resolveLink(['a', 'area', 'base', 'link'],'href')
+			self.__resolveLink(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'],'src')
 			self.startQueue()
 		else:
 			self.__completed.append(url)
@@ -37,6 +39,15 @@ class Cloner:
 
 		return path
 
+	def __resolveLink(self, elements, mode):
+		for el in self.bs4.find_all(elements):
+			link = el.get(mode)
+			if link and link != '#':
+				urlparsed = urlparse(link)
+				if urlparsed.netloc and urlparsed.netloc != self.urlparsed.netloc and not urlparsed.scheme:
+					link = f"{urlparsed.scheme if urlparsed.scheme != '' else 'http' }://{urlparsed.netloc}/{self.__resolveUrlPath(urlparsed)}"
+					el.attrs[mode] = link
+	
 	def __resolveUrlPath(self, urlparsed):
 		path = urlparsed.path if urlparsed.path else ''
 		params = ';' + urlparsed.params if urlparsed.params else ''
@@ -52,28 +63,32 @@ class Cloner:
 			links = re.findall(r'url\((.*?)\)', content)
 			for link in links:
 				link = link.strip('\'').strip('"')
+				if link and not str(link).startswith('data:'):
+					linkParsed = urlparse(link)
+					if linkParsed.netloc and linkParsed.netloc != self.urlparsed.netloc:
+						continue
 
-				linkParsed = urlparse(link)
-				link = urljoin(linkRaw, link)
-				link = urljoin(link, linkParsed.path)
-				linkParsed = urlparse(link)
-				
-				if linkParsed.netloc == self.urlparsed.netloc and link not in self.__completed:
-	
-					path = os.path.join(self.project_dir, linkParsed.path.lstrip('/'))
-					dirname = os.path.dirname(path)
-					basename = os.path.basename(path)
+					link = urljoin(linkRaw, linkParsed.path if str(link).startswith('/') else os.path.join('.', linkParsed.path))
+					# link = urljoin(link, linkParsed.path)
 
-					if basename:
-						os.makedirs(dirname, exist_ok=True)
+					linkParsed = urlparse(link)
+					
+					if linkParsed.netloc == self.urlparsed.netloc and link not in self.__completed:
+		
+						path = os.path.join(self.project_dir, linkParsed.path.lstrip('/'))
+						dirname = os.path.dirname(path)
+						basename = os.path.basename(path)
 
-						print(link,"DOWNLOADING...")
+						if basename:
+							os.makedirs(dirname, exist_ok=True)
 
-						resp = self.request.get(link)
-						with open(path, 'wb') as file:
-							file.write(resp.content if resp.status_code == 200 else str.encode(''))
-							self.__completed.append(link)
-							print(link,"DONE...")
+							print(link,"DOWNLOADING...")
+
+							resp = self.request.get(link)
+							with open(path, 'wb') as file:
+								file.write(resp.content if resp.status_code == 200 else str.encode(''))
+								self.__completed.append(link)
+								print(link,"DONE...")
 
 
 	def downloadAsset(self, elements, attribute):
@@ -95,6 +110,7 @@ class Cloner:
 						basename = os.path.basename(path)
 						
 						if basename and basename != '.':
+							
 							os.makedirs(dirname, exist_ok=True)
 
 							print(link,"DOWNLOADING...")
@@ -123,12 +139,12 @@ class Cloner:
 					self.__completed.append(self.url)
 					
 					print(self.url, "DONE...")
-					
+
 
 	def startQueue(self):
 		self.downloadPage()
-		self.downloadAsset(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'], 'src')
 		self.downloadAsset(['area', 'link'], 'href')
+		self.downloadAsset(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'], 'src')
 
 		for a in self.bs4.select('a'):
 			url = a.get('href')
@@ -140,6 +156,11 @@ class Cloner:
 						Cloner(url, project_dir=self.project_dir, completed=self.__completed)
 
 if __name__ == "__main__":
-	url = "https://demo.adminkit.io"
-	# url = "https://demos.creative-tim.com/argon-dashboard-pro/pages/dashboards/dashboard.html"
-	cloner = Cloner(url)
+	# url = "https://demo.adminkit.io"
+	# cloner = Cloner(url, project_dir='../demo.adminkit.io')
+	
+	url = "https://demos.creative-tim.com/argon-dashboard-pro/pages/dashboards/dashboard.html"
+	cloner = Cloner(url, project_dir='../demos.creative-tim.com')
+
+	# url = "https://www.wrappixel.com/demos/admin-templates/materialpro-bootstrap-latest/material-pro/src/material/index.html"
+	# cloner = Cloner(url, project_dir='../www.wrappixel.com')
